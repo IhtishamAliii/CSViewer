@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+    :root {
+        --primary-color: #3498db;
+        --secondary-color: #2c3e50;
+        --background-color: #ecf0f1;
+        --table-header-bg: #34495e;
+        --table-header-color: #ffffff;
+        --table-row-even: #f8f9fa;
+        --table-row-odd: #ffffff;
+        --table-border: #bdc3c7;
+    }
+
+    body, html {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        /*        padding: 20px;*/
+        background-color: var(--background-color);
+        color: var(--secondary-color);
+/*        height: 100%;*/
+        padding-top: 20px;
+    }
+
+    .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-width: 1200px;
+        margin: 0 auto;
+        height: auto !important;
+        min-height: auto;
+
+    }
+
+    .tabs {
+        display: flex;
+        margin-bottom: 20px;
+        background-color: var(--table-header-bg);
+        border-radius: 5px;
+        overflow: hidden;
+    }
+
+    .tab {
+        padding: 12px 24px;
+        background-color: transparent;
+        cursor: pointer;
+        border: none;
+        outline: none;
+        color: var(--table-header-color);
+        transition: background-color 0.3s;
+    }
+
+    .tab:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .tab.active {
+        background-color: var(--primary-color);
+    }
+
+    #csvInput {
+        width: 100%;
+        height: 200px;
+        margin-bottom: 10px;
+        border: 1px solid var(--table-border);
+        border-radius: 4px;
+        padding: 8px;
+        font-family: inherit;
+    }
+
+    #tableContainer {
+        overflow: auto;
+        max-height: 500px;
+        border: 1px solid var(--table-border);
+        border-radius: 4px;
+        width: 100%;
+    }
+
+    #csvTable {
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+    }
+
+    #csvTable th,
+    #csvTable td {
+        border: 1px solid var(--table-border);
+        padding: 12px;
+        position: relative;
+    }
+
+    #csvTable th {
+        background-color: var(--table-header-bg);
+        color: var(--table-header-color);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        font-weight: 600;
+    }
+
+    #csvTable tr:nth-child(even) {
+        background-color: var(--table-row-even);
+    }
+
+    #csvTable tr:nth-child(odd) {
+        background-color: var(--table-row-odd);
+    }
+
+    .resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 5px;
+        background: rgba(0, 0, 0, 0.1);
+        cursor: col-resize;
+        user-select: none;
+    }
+
+    .row-resizer {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 5px;
+        background: rgba(0, 0, 0, 0.1);
+        cursor: row-resize;
+        user-select: none;
+    }
+
+    .download-buttons {
+        margin-top: 10px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+    }
+
+    button {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    button:hover {
+        background-color: #2980b9;
+    }
+
+    .editable {
+        min-height: 20px;
+        outline: none;
+    }
+
+    .editable:focus {
+        background-color: #e8f0fe;
+    }
+
+    footer {
+        text-align: center;
+        padding: 10px;
+        margin-top: 10px;
+/*        background-color: var(--table-header-bg);*/
+        color: #000;
+    }
+
+    .heart {
+        color: #e74c3c;
+    }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>CSV Viewer and Editor</h1>
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('input')">Input</button>
+            <button class="tab" onclick="showTab('table')">Table</button>
+        </div>
+        <div id="inputTab">
+            <textarea id="csvInput" placeholder="Paste your CSV data here"></textarea>
+            <button onclick="processCSV()">Process CSV</button>
+        </div>
+        <div id="tableTab" style="display: none;">
+            <div class="download-buttons">
+                <button onclick="downloadData('xlsx')">Download XLSX</button>
+                <button onclick="downloadData('csv')">Download CSV</button>
+                <button onclick="downloadData('txt')">Download TXT</button>
+            </div>
+            <div id="tableContainer">
+                <table id="csvTable"></table>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <p>Made With <span class="heart">❤</span> By Ihtisham Ali</p>
+    </footer>
+    <script>
+    let tableData = [];
+
+    function showTab(tabName) {
+        document.getElementById('inputTab').style.display = tabName === 'input' ? 'block' : 'none';
+        document.getElementById('tableTab').style.display = tabName === 'table' ? 'block' : 'none';
+
+        const tabs = document.getElementsByClassName('tab');
+        for (let tab of tabs) {
+            tab.classList.remove('active');
+        }
+        event.target.classList.add('active');
+    }
+
+    function processCSV() {
+        const csvData = document.getElementById('csvInput').value;
+        tableData = csvData.split('\n').map(row => row.split(',').map(cell => cell.trim()));
+
+        const table = document.getElementById('csvTable');
+        table.innerHTML = '';
+
+        const header = table.createTHead();
+        const headerRow = header.insertRow();
+        for (let cell of tableData[0]) {
+            const th = document.createElement('th');
+            th.textContent = cell;
+            th.style.minWidth = '100px';
+            const resizer = document.createElement('div');
+            resizer.className = 'resizer';
+            th.appendChild(resizer);
+            headerRow.appendChild(th);
+        }
+
+        const body = table.createTBody();
+        for (let i = 1; i < tableData.length; i++) {
+            const row = body.insertRow();
+            for (let cell of tableData[i]) {
+                const td = row.insertCell();
+                td.innerHTML = `<div class="editable" contenteditable="true">${cell}</div>`;
+                td.querySelector('.editable').addEventListener('blur', function() {
+                    tableData[i][row.cells.indexOf(td)] = this.textContent;
+                });
+            }
+            const rowResizer = document.createElement('div');
+            rowResizer.className = 'row-resizer';
+            row.cells[0].appendChild(rowResizer);
+        }
+
+        setupResizers();
+        showTab('table');
+    }
+
+    function setupResizers() {
+        const table = document.getElementById('csvTable');
+        let currentResizer;
+
+        table.addEventListener('mousedown', function(e) {
+            if (e.target.className === 'resizer') {
+                currentResizer = e.target;
+                const initialX = e.clientX;
+                const initialWidth = currentResizer.parentElement.offsetWidth;
+
+                document.addEventListener('mousemove', resize);
+                document.addEventListener('mouseup', stopResize);
+
+                function resize(e) {
+                    const width = initialWidth + (e.clientX - initialX);
+                    currentResizer.parentElement.style.width = width + 'px';
+                }
+
+                function stopResize() {
+                    document.removeEventListener('mousemove', resize);
+                    document.removeEventListener('mouseup', stopResize);
+                }
+            } else if (e.target.className === 'row-resizer') {
+                currentResizer = e.target;
+                const initialY = e.clientY;
+                const initialHeight = currentResizer.parentElement.parentElement.offsetHeight;
+
+                document.addEventListener('mousemove', resizeRow);
+                document.addEventListener('mouseup', stopResizeRow);
+
+                function resizeRow(e) {
+                    const height = initialHeight + (e.clientY - initialY);
+                    currentResizer.parentElement.parentElement.style.height = height + 'px';
+                }
+
+                function stopResizeRow() {
+                    document.removeEventListener('mousemove', resizeRow);
+                    document.removeEventListener('mouseup', stopResizeRow);
+                }
+            }
+        });
+    }
+
+    function downloadData(format) {
+        if (tableData.length === 0) {
+            alert('No data to download. Please process CSV first.');
+            return;
+        }
+
+        let content, filename, mimeType;
+
+        switch (format) {
+            case 'xlsx':
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(tableData);
+                XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+                content = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                filename = 'data.xlsx';
+                mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                break;
+            case 'csv':
+                content = tableData.map(row => row.join(',')).join('\n');
+                filename = 'data.csv';
+                mimeType = 'text/csv;charset=utf-8;';
+                break;
+            case 'txt':
+                content = tableData.map(row => row.join('\t')).join('\n');
+                filename = 'data.txt';
+                mimeType = 'text/plain;charset=utf-8;';
+                break;
+        }
+
+        const blob = new Blob([content], { type: mimeType });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+    </script>
+</body>
+
+</html>
